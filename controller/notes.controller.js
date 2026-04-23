@@ -74,3 +74,16 @@ export const DeleteNote=CatchError(async(req,res)=>{
              note:deletedNote
           })
 })
+
+export const GetallNotes=CatchError(async(req,res)=>{
+          const userId=req.user.userId
+
+          const notes=await NOTE.find({owner:userId}).sort({createdAt:-1})
+
+          res.status(200).json({
+              success:true,
+              count:notes.length,
+              message:"Notes fetched successfully",
+              notes:notes
+          })
+})
