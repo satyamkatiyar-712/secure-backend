@@ -1,7 +1,6 @@
 import express from 'express'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
-import {globalRatelimit} from './Middleware/LoginReqLimiter.js'
 import {globalErrorHandler } from './Middleware/errorHandler.js'
 import authenticationRoutes from './routes/authentication.routes.js'
 import notesRoutes from './routes/notes.routes.js'
