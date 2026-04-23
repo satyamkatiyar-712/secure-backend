@@ -53,3 +53,24 @@ export const UpdateNote=CatchError(async(req,res)=>{
                note:updatedNote
            })
 })
+
+export const DeleteNote=CatchError(async(req,res)=>{
+             const noteId=req.params.id
+          const note= await NOTE.findById(noteId)
+
+          if(!note){
+             throw new AppError(404,"No note found")
+          }
+
+          if(note.owner.toString()!==req.user.userId){
+              throw new AppError(404,"Unauthorized not your note")
+          }
+
+          const deletedNote=await NOTE.findByIdAndDelete(noteId)
+
+          res.status(200).json({
+             success:true,
+             message:"Note deleted successfully",
+             note:deletedNote
+          })
+})
