@@ -6,10 +6,10 @@ import {Loginlimit,globalRatelimit} from '../Middleware/LoginReqLimiter.js'
 
 const router= Router()
 
-router.post("/notes/signup",SignupUser)
-router.post("/notes/login",Loginlimit,Loginuser)
-router.post("/notes/logout",authHandlerMiddleware,LogoutUser)
-router.post("/notes/refresh-token",RenewAccesstoken)
-router.get("/notes/main",authHandlerMiddleware,AuthorizationMiddleware('admin','teacher'),globalRatelimit,Mainpage)
+router.post("/signup",SignupUser)
+router.post("/login",Loginlimit,Loginuser)
+router.post("/logout",authHandlerMiddleware,LogoutUser)
+router.post("/refresh-token",RenewAccesstoken)
+router.get("/main",authHandlerMiddleware,AuthorizationMiddleware('admin','teacher'),globalRatelimit,Mainpage)
 
 export default router

@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import {globalRatelimit} from './Middleware/LoginReqLimiter.js'
 import {globalErrorHandler } from './Middleware/errorHandler.js'
 import authenticationRoutes from './routes/authentication.routes.js'
+import notesRoutes from './routes/notes.routes.js'
 
 export const app=express()
 app.use(helmet())
@@ -12,6 +13,7 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 
-app.use("/api",authenticationRoutes)
+app.use("/api/auth",authenticationRoutes)
+app.use("/api/notes",notesRoutes)
 
 app.use(globalErrorHandler)

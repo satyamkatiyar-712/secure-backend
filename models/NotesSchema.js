@@ -18,7 +18,7 @@ const NotesSchema= mongoose.Schema({
       Tags:{
         type:[String],
         enum:["Work","Imporant","Idea","Creative"],
-        default:''
+        default:[]
       },
       isPinned:{
         type:Boolean,
