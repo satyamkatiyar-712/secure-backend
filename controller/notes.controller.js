@@ -1,89 +1,150 @@
-import { NOTE } from "../models/NotesSchema.js"
-import { CatchError } from "../utils/CatchError.js"
-import { AppError } from "../utils/AppError.js"
+import { NOTE } from "../models/NotesSchema.js";
+import { CatchError } from "../utils/CatchError.js";
+import { AppError } from "../utils/AppError.js";
+import { redisClient } from "../Redis/redisClient.js";
+import { json } from "express";
 
-export const CreateNote=CatchError(async(req,res)=>{
-        const {title,content}=req.body
-        if(!title || !content){
-            throw new AppError(400,"Provide both title and content to create a note")
-        }
-       
-        const userId=req.user.userId
-        const newNote=new NOTE({
-             title,
-             content,
-             owner:userId
+export const CreateNote = CatchError(async (req, res) => {
+    const { title, content } = req.body;
+    if (!title || !content) {
+        throw new AppError(400, "Provide both title and content to create a note");
+    }
+
+    const userId = req.user.userId;
+    const cacheKey = `notes_v2:${userId}`
+    const newNote = new NOTE({
+        title,
+        content,
+        owner: userId,
+    });
+    await newNote.save();
+
+    try {
+        await redisClient.del(cacheKey)
+    }
+    catch (redisError) {
+        console.error('redis has failed to delete the key')
+    }
+
+    res.status(201).json({
+        success: true,
+        message: "Note created successfully",
+        note: newNote,
+    });
+});
+
+export const UpdateNote = CatchError(async (req, res) => {
+    const noteId = req.params.id;
+    const { title, content } = req.body;
+    const userId = req.user.userId;
+    const cacheKey = `notes_v2:${userId}`
+    if (!title || !content) {
+        throw new AppError(400, "Provide the detail to update the note");
+    }
+
+    const note = await NOTE.findById(noteId);
+    if (!note) {
+        throw new AppError(404, "No note found");
+    }
+
+    //security check
+    if (note.owner.toString() !== userId) {
+        throw new AppError(403, "Unauthorized not access to note");
+    }
+
+    const updatedNote = await NOTE.findByIdAndUpdate(
+        noteId,
+        { title, content },
+        { new: true, runValidators: true },
+    );
+
+    try {
+        await redisClient.del(cacheKey)
+    }
+    catch (redisError) {
+        console.error('redis has failed to delete the key')
+    }
+
+
+    res.status(200).json({
+        success: true,
+        message: "Note updated successfully",
+        note: updatedNote,
+    });
+});
+
+export const DeleteNote = CatchError(async (req, res) => {
+    const userId = req.user.userId;
+    const cacheKey = `notes_v2:${userId}`
+    const noteId = req.params.id;
+    const note = await NOTE.findById(noteId);
+
+    if (!note) {
+        throw new AppError(404, "No note found");
+    }
+
+    if (note.owner.toString() !== req.user.userId) {
+        throw new AppError(404, "Unauthorized not your note");
+    }
+
+    const deletedNote = await NOTE.findByIdAndDelete(noteId);
+
+    try {
+        await redisClient.del(cacheKey)
+    }
+    catch (redisError) {
+        console.error('redis has failed to delete the key')
+    }
+
+    res.status(200).json({
+        success: true,
+        message: "Note deleted successfully",
+        note: deletedNote,
+    });
+});
+
+export const GetallNotes = CatchError(async (req, res) => {
+    const userId = req.user.userId;
+
+    const cacheKey = `notes_v2:${userId}`;
+
+    console.time("inside redis")
+     let cachedNotes
+    try {
+         cachedNotes = await redisClient.get(cacheKey);
+    }
+    catch (redisError) {
+        console.error("The redis has failed to get cache")
+    }
+    console.timeEnd("inside redis")
+    if (cachedNotes) {
+        const parshedNotes = JSON.parse(cachedNotes)
+        return res.status(200).json({
+            success: true,
+            count: parshedNotes.length,
+            message: "Notes fetched successfully",
+            notes: parshedNotes,
+        });
+    }
+
+    console.time("searching db")
+    const notes = await NOTE.find({ owner: userId }).sort({ createdAt: -1 });
+    console.timeEnd("searching db")
+
+    try {
+        await redisClient.set(cacheKey, JSON.stringify(notes), {
+            EX: 3600
         })
-        await newNote.save()
 
-       res.status(201).json({
-         success:true,
-          message:"Note created successfully",
-          note:newNote
-       })
-
-})
-
-export const UpdateNote=CatchError(async(req,res)=>{
-
-         const noteId= req.params.id
-             const {title,content}=req.body
-            if(!title || !content){
-                throw new AppError(400,"Provide the detail to update the note")
-            }
-
-            const note = await NOTE.findById(noteId)
-            if(!note){
-                throw new AppError(404,"No note found")
-            }
-
-            //security check
-            if(note.owner.toString()!==req.user.userId){
-                throw new AppError(403,"Unauthorized not access to note")
-            }
-
-            const updatedNote= await NOTE.findByIdAndUpdate(
-                noteId,
-                {title,content},
-                { new: true, runValidators: true }
-            )
-           res.status(200).json({
-               success:true,
-               message:"Note updated successfully",
-               note:updatedNote
-           })
-})
-
-export const DeleteNote=CatchError(async(req,res)=>{
-             const noteId=req.params.id
-          const note= await NOTE.findById(noteId)
-
-          if(!note){
-             throw new AppError(404,"No note found")
-          }
-
-          if(note.owner.toString()!==req.user.userId){
-              throw new AppError(404,"Unauthorized not your note")
-          }
-
-          const deletedNote=await NOTE.findByIdAndDelete(noteId)
-
-          res.status(200).json({
-             success:true,
-             message:"Note deleted successfully",
-             note:deletedNote
-          })
-})
-
-export const GetallNotes=CatchError(async(req,res)=>{
-          const userId=req.user.userId
-
-          const notes=await NOTE.find({owner:userId}).sort({createdAt:-1})
-
-          res.status(200).json({
-              success:true,
-              count:notes.length,
-              message:"Notes fetched successfully",
-              notes:notes
-          })
-})
+    }
+    catch (redisError) {
+        console.error("The redis cache save has failed")
+    }
+    console.time("searched db")
+    res.status(200).json({
+        success: true,
+        count: notes.length,
+        message: "Notes fetched successfully",
+        notes: notes,
+    });
+});
