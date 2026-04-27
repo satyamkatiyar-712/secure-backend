@@ -1,12 +1,14 @@
 import express from 'express'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
+import compression from 'compression'
 import {globalErrorHandler } from './Middleware/errorHandler.js'
 import authenticationRoutes from './routes/authentication.routes.js'
 import notesRoutes from './routes/notes.routes.js'
 
 export const app=express()
 app.use(helmet())
+app.use(compression())
 app.use(cookieParser())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))

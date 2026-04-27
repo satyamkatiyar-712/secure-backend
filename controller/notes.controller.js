@@ -1,8 +1,11 @@
-import { NOTE } from "../models/NotesSchema.js";
-import { CatchError } from "../utils/CatchError.js";
-import { AppError } from "../utils/AppError.js";
-import { redisClient } from "../Redis/redisClient.js";
-import { json } from "express";
+import zlib from 'zlib';
+import { promisify } from 'util';
+const brotliCompress = promisify(zlib.brotliCompress);
+const brotliDecompress = promisify(zlib.brotliDecompress);
+import { NOTE } from "../models/NotesSchema.js"
+import { CatchError } from "../utils/CatchError.js"
+import { AppError } from "../utils/AppError.js"
+import { redisClient } from "../Redis/redisClient.js"
 
 export const CreateNote = CatchError(async (req, res) => {
     const { title, content } = req.body;
@@ -109,16 +112,21 @@ export const GetallNotes = CatchError(async (req, res) => {
     const cacheKey = `notes_v2:${userId}`;
 
     console.time("inside redis")
-     let cachedNotes
+    let cachedNotes
     try {
-         cachedNotes = await redisClient.get(cacheKey);
+        cachedNotes = await redisClient.get(cacheKey);
     }
     catch (redisError) {
         console.error("The redis has failed to get cache")
     }
     console.timeEnd("inside redis")
     if (cachedNotes) {
-        const parshedNotes = JSON.parse(cachedNotes)
+        const buffer = Buffer.from(cachedNotes,'base64')
+
+        const decompressedNotes = await brotliDecompress(buffer)
+
+        const parshedNotes = JSON.parse(decompressedNotes.toString('utf-8'))
+
         return res.status(200).json({
             success: true,
             count: parshedNotes.length,
@@ -132,10 +140,15 @@ export const GetallNotes = CatchError(async (req, res) => {
     console.timeEnd("searching db")
 
     try {
-        await redisClient.set(cacheKey, JSON.stringify(notes), {
-            EX: 3600
-        })
+        if (notes.length > 0) {
+             const jsonString = JSON.stringify(notes)
 
+             const compressedNotes = await brotliCompress(jsonString)
+
+             await redisClient.set(cacheKey, compressedNotes.toString('base64'), {
+                EX: 3600
+            })
+        }
     }
     catch (redisError) {
         console.error("The redis cache save has failed")
